@@ -16,6 +16,7 @@ def question_one():
     descending order.
     """
     rdd = spark.sparkContext.textFile("hdfs://localhost:9000/user/dx/edges.tsv")
+    # change username '/user/dx/' 
     #   rdd = spark.sparkContext.textFile("edges.tsv")
     rdd2 = rdd.map(lambda x: x.split())
 
@@ -54,6 +55,7 @@ def question_two():
     5 number of diseases in a descending order.
     """
     rdd = spark.sparkContext.textFile("hdfs://localhost:9000/user/dx/edges.tsv")
+    # change username '/user/dx/' 
     #   rdd = spark.sparkContext.textFile("edges.tsv")
      # filter by compound - disease relationships only
     rdd2 = rdd.map(lambda x: x.split())
@@ -91,6 +93,7 @@ def question_three():
     number of genes. Output the results.
     """
     rdd = spark.sparkContext.textFile("hdfs://localhost:9000/user/dx/edges.tsv")
+    # change username '/user/dx/' 
     #   rdd = spark.sparkContext.textFile("edges.tsv")
     rdd2 = rdd.map(lambda x: x.split())
     rdd3 = rdd2.filter(lambda x: x[1] in ["CdG", "CuG", "CbG"])
@@ -106,6 +109,7 @@ def question_three():
 
     # get the id - name relationship from nodes.tsv
     nodes_rdd = spark.sparkContext.textFile("hdfs://localhost:9000/user/dx/nodes.tsv")
+    # change username '/user/dx/' 
     # nodes_rdd = spark.sparkContext.textFile("nodes.tsv")
     nodes_rdd2 = nodes_rdd.map(lambda x: x.split())
 

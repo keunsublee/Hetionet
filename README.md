@@ -1,8 +1,92 @@
 # Hetionet project
+This project analyzes the HetioNet biomedical knowledge graph using PySpark on Hadoop, MongoDB, and Neo4j to explore drug-gene, drug-disease, and disease-anatomy relationships. It processes large-scale biomedical data with the following components:
+## PySpark on Hadoop:
+Processes edges.tsv and nodes.tsv files to answer three queries:
+- Computes the number of genes and diseases per drug, outputting the top 5 drugs by gene count.
+
+- Calculates the number of diseases associated with 1, 2, 3, ..., n drugs, displaying the top 5 disease counts.
+
+- Identifies the names of drugs with the top 5 gene associations by joining edge and node data.
+
+Uses Spark RDDs and DataFrames for distributed processing of large datasets.
+
+## MongoDB:
+Queries the Disease collection using find_one({"_id": disease_id}) to retrieve all fields for a given disease ID.
+
+Leverages pre-aggregated data in the database for efficient retrieval of disease-related information.
+
+## Neo4j:
+Executes a graph query to identify compounds meeting specific criteria:
+```
+- Compound upregulates a gene (CuG)
+- Anatomy downregulates a gene (AdG)
+- Disease localizes in anatomy (DlA)
+- compound does not treat disease (CtD)
+or
+- Compound downregulates a gene (CdG)
+- Anatomy upregulates a gene (AuG)
+- Disease localizes in anatomy (DlA)
+- compound does not treat disease (CtD)
+```
+
+Uses Neo4j’s graph database to model and query complex relationships between compounds, genes, anatomies, and diseases.
 
 ## My Contribution:
 - Project1-neo4j.py
 - Project2-hadoop-pyspark.py (questions 1 & 3)
+
+# How to run:
+## Project 1
+Requires uploading data to mongodb and neo4j localhost
+
+## Project 2
+## Without hadoop:
+
+- pip install pyspark (may require python3-venv)
+- spark-submit Project2-local.py --nodes nodes.tsv --edges edges.tsv
+
+## Hadoop hdfs locally (requires hadoop):
+```
+- sudo service ssh start
+- start-dfs.sh
+- hadoop fs -mkdir -p /user/\<youruser>		
+    - make directory for files, change \<youruser> 
+- hadoop fs -put ~/\<yourpath>/nodes.tsv 	    
+    - put tsv in hdfs, change \<yourpath> to local file path of nodes.tsv
+- hadoop fs -put ~/\<yourpath>/edges.tsv 	    
+    - put tsv in hdfs, change \<yourpath> to local file path of edges.tsv
+    - must also change tsv file paths in code to match "hdfs://localhost:9000/\<your hdfs path>/nodes.tsv"
+- change username '/user/dx/' to \<youruser> in Project2-hadoop-pyspark.py
+- spark-submit Project2-hadoop-pyspark.py
+```
+
+## Expected Output:
+```
+Question 1: 
++-----------------+-----+--------+
+|         Compound|Genes|Diseases|
++-----------------+-----+--------+
+|Compound::DB08865|  580|       1|
+|Compound::DB01254|  558|       1|
+|Compound::DB00997|  528|      17|
+|Compound::DB00170|  521|       0|
+|Compound::DB00390|  521|       2|
++-----------------+-----+--------+
+
+Question 2: 
+1 drugs -> 10 diseases
+2 drugs -> 7 diseases
+3 drugs -> 6 diseases
+11 drugs -> 6 diseases
+9 drugs -> 6 diseases
+
+Question 3: 
+Crizotinib -> 580
+Dasatinib -> 558
+Doxorubicin -> 528
+Digoxin -> 521
+Menadione -> 521
+```
 
 # Project 1
 ## Query 1:
@@ -63,17 +147,18 @@ RETURN DISTINCT compound.name
 ```
 
 #### Explanation:
+```
 It matches for the pattern where:
-- Compound upregulates a gene and (CuG)
+- Compound upregulates a gene (CuG)
 - Anatomy downregulates a gene (AdG)
 - Disease localizes in anatomy (DlA)
 - compound does not treat disease (CtD)
 OR
-- Compound downregulates a gene and (CdG)
+- Compound downregulates a gene (CdG)
 - Anatomy upregulates a gene (AuG)
  - Disease localizes in anatomy (DlA)
  - compound does not treat disease (CtD)
-
+```
 
 # Project 2
 ## Q1:
@@ -93,19 +178,15 @@ Get top 5 drugs with the most gene associations and how many diseases each drug 
 - Sort results by number of genes in descending order, limit 5
 
 #### Design Patterns:
-- Summarization Pattern:
-    - Counting and summing genes for each drug
-    - Counting and summing diseases for each drug
-- Filtering Pattern: 
-    - Filter RDDs for drug-gene and drug-disease  associations
-- Pair Pattern:
-    - (Compound ID, Compound Name)
-    - (Compound ID, Gene Count)
-    - (Compound, (Gene Count, Disease Count))
-- Join patterns: 
-    - Join disease count and gene counts for each drug
-- Iteration patterns: 
-    -Sorting and limiting the results to get the top 5 drugs.
+- Map-Reduce Pattern: Aggregates gene and disease counts per drug u- sing map to create (Compound ID, 1) pairs and reduceByKey to compute (Compound ID, Gene Count) and (Compound ID, Disease Count), enabling distributed summarization.
+
+- Filter Pattern: Isolates drug-gene (CdG, CuG, CbG) and drug-disease (CtD, CpD) edges to focus on relevant relationships.
+
+- Join Pattern: Merges gene and disease count DataFrames on Compound ID to produce (Compound ID, (Gene Count, Disease Count)), enriching the dataset.
+
+- Top-K Pattern: Ranks drugs by gene count in descending order and selects the top 5, optimizing result presentation for downstream use (e.g., MongoDB storage, React UI display).
+
+
 
 ## Q2:
 Compute the number of diseases associated with 1, 2, 3, …, n drugs. Output results with the top 5 number of diseases in a descending order
@@ -121,13 +202,11 @@ Compute the number of diseases associated with 1, 2, 3, …, n drugs. Output res
 - Take and print top 5 results
 
 #### Design patterns:
-- Summarization pattern:
-    - Counting and summing drugs for each disease
-    - Counting and summing diseases for unique drug counts
-- Filtering pattern:
-    - Filters to only disease - drug relationships
-- Pairs pattern:
-    - The key-value pair (Disease, Compound) are unique so stripes pattern wouldn't be helpful
+- Map-Reduce Pattern: Aggregates drug counts per disease and then diseases per drug count using map to create (Disease, 1) and (Drug Count, 1) pairs, followed by reduceByKey to compute (Disease, Drug Count) and (Drug Count, Disease Count), enabling distributed hierarchical summarization.
+
+- Filter Pattern: Isolates drug-disease relationships (CtD, CpD) to focus on relevant edges.
+
+- Top-K Pattern: Ranks (Drug Count, Disease Count) pairs by disease count in descending order and selects the top 5, optimizing result presentation for downstream use (e.g., MongoDB storage, React UI display).
 
 
 
@@ -149,67 +228,11 @@ Get the name of drugs that have the top 5 number of genes. Output the results.
 - Get top 5 results
 
 #### Design Patterns:
-- Summarization Pattern:
-    - Counting and summing diseases for each drug
-- Filtering Pattern: 
-    - Filter RDDs for drug-gene associations
-- Pair Pattern:
-    - Key-Value pair: (Compound ID, Compound Name)
-    - (Compound ID, Gene Count)
-    - (Compound Name, Gene Count)
-- Join patterns: 
-    - Join name and gene counts for each drug
-- Iteration patterns: 
-    -Sorting and limiting the results to get the top 5 drugs.
+- Map-Reduce Pattern: Aggregates gene counts per drug using map to create (Compound ID, 1) pairs and reduceByKey to compute (Compound ID, Gene Count), enabling distributed summarization.
 
-# How to run:
-## Project 1
-Requires uploading data to mongodb and neo4j localhost
+- Filter Pattern: Isolates drug-gene associations (CdG, CuG, CbG) to focus on relevant edges.
 
-## Project 2
-## Without hadoop:
+- Join Pattern: Merges (Compound ID, Gene Count) with (Compound ID, Name) from nodes.tsv to produce (Compound ID, (Gene Count, Name)), enriching the dataset with drug names.
 
-- pip install pyspark (in a virtual env)
-- spark-submit Project2-local.py --nodes nodes.tsv --edges edges.tsv
+- Top-K Pattern: Ranks drugs by gene count in descending order and selects the top 5, optimizing result presentation for downstream use (e.g., MongoDB storage, React UI display).
 
-## Hadoop hdfs locally (requires hadoop):
-```
-- sudo service ssh start
-- start-dfs.sh
-- hadoop fs -mkdir -p /user/\<youruser>		
-    - make directory for files, change \<youruser> 
-- hadoop fs -put ~/\<yourpath>/nodes.tsv 	    
-    - put tsv in hdfs, change \<yourpath> to local file path
-- hadoop fs -put ~/\<yourpath>/edges.tsv 	    
-    - put tsv in hdfs, change \<yourpath> to local file path
-    - must also change tsv file paths in code to match "hdfs://localhost:9000/\<your hdfs path>/nodes.tsv"
-- spark-submit Project2-hadoop-pyspark.py
-```
-
-## Expected Output:
-```
-Question 1: 
-+-----------------+-----+--------+
-|         Compound|Genes|Diseases|
-+-----------------+-----+--------+
-|Compound::DB08865|  580|       1|
-|Compound::DB01254|  558|       1|
-|Compound::DB00997|  528|      17|
-|Compound::DB00170|  521|       0|
-|Compound::DB00390|  521|       2|
-+-----------------+-----+--------+
-
-Question 2: 
-1 drugs -> 10 diseases
-2 drugs -> 7 diseases
-3 drugs -> 6 diseases
-11 drugs -> 6 diseases
-9 drugs -> 6 diseases
-
-Question 3: 
-Crizotinib -> 580
-Dasatinib -> 558
-Doxorubicin -> 528
-Digoxin -> 521
-Menadione -> 521
-```
